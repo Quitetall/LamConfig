@@ -1,7 +1,7 @@
 return {
   -- mini.surround — add/delete/change surrounding pairs
   {
-    "echasnovski/mini.surround",
+    "nvim-mini/mini.surround",
     opts = {
       mappings = {
         add = "gsa",
@@ -109,8 +109,8 @@ return {
     "folke/which-key.nvim",
     opts = {
       plugins = { spelling = true },
-      defaults = {
-        ["<leader>l"] = { name = "+lsp" },
+      spec = {
+        { "<leader>l", group = "lsp" },
       },
     },
   },

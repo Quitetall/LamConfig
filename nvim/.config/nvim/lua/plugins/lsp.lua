@@ -1,7 +1,7 @@
 return {
   -- Mason — package manager for LSP servers, DAP, linters, formatters
   {
-    "williamboman/mason.nvim",
+    "mason-org/mason.nvim",
     opts = {
       ensure_installed = {
         -- LSP servers

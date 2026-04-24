@@ -50,10 +50,7 @@ opt.mouse = "a"
 
 -- Fill chars — cleaner look
 opt.fillchars = {
-  foldopen = "",
-  foldclose = "",
   fold = " ",
-  foldsep = " ",
   diff = "╱",
   eob = " ",
 }

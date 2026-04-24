@@ -49,9 +49,10 @@ return {
     end,
   },
 
-  -- Indent blankline — indent guides
+  -- Indent blankline v3 — indent guides
   {
     "lukas-reineke/indent-blankline.nvim",
+    main = "ibl",
     opts = {
       indent = {
         char = "│",
@@ -61,7 +62,6 @@ return {
         enabled = true,
         show_start = true,
         show_end = false,
-        highlight = { "Function", "Label" },
       },
       exclude = {
         filetypes = {
