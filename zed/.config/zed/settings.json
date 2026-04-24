@@ -1,0 +1,97 @@
+{
+  // ── Theme ──────────────────────────────────────────────
+  "theme": {
+    "mode": "dark",
+    "dark": "Kanagawa Dragon",
+    "light": "Kanagawa Lotus"
+  },
+
+  // ── Font ───────────────────────────────────────────────
+  "buffer_font_family": "Intel One Mono",
+  "buffer_font_size": 14,
+  "buffer_font_features": {
+    "calt": true,
+    "liga": true,
+    "ss01": true
+  },
+  "ui_font_family": "Inter",
+  "ui_font_size": 14,
+
+  // ── Editor ─────────────────────────────────────────────
+  "tab_size": 4,
+  "hard_tabs": false,
+  "relative_line_numbers": true,
+  "cursor_blink": true,
+  "scrollbar": { "show": "auto" },
+  "scroll_beyond_last_line": "off",
+  "vertical_scroll_margin": 10,
+  "indent_guides": {
+    "enabled": true,
+    "coloring": "indent_aware"
+  },
+  "inlay_hints": {
+    "enabled": true,
+    "show_type_hints": true,
+    "show_parameter_hints": true
+  },
+  "format_on_save": "on",
+  "ensure_final_newline_on_save": true,
+  "remove_trailing_whitespace_on_save": true,
+  "show_whitespaces": "boundary",
+  "soft_wrap": "editor_width",
+  "line_height": "comfortable",
+
+  // ── Git ────────────────────────────────────────────────
+  "git": {
+    "inline_blame": { "enabled": true },
+    "git_gutter": "tracked_files"
+  },
+
+  // ── Terminal ───────────────────────────────────────────
+  "terminal": {
+    "shell": { "program": "zsh" },
+    "font_family": "Intel One Mono",
+    "font_size": 13,
+    "blinking": "on",
+    "line_height": "comfortable"
+  },
+
+  // ── File types ─────────────────────────────────────────
+  "file_types": {
+    "C": { "tab_size": 4, "hard_tabs": false },
+    "Python": { "tab_size": 4, "hard_tabs": false },
+    "Rust": { "tab_size": 4, "hard_tabs": false },
+    "Go": { "tab_size": 4, "hard_tabs": true },
+    "JavaScript": { "tab_size": 2, "hard_tabs": false },
+    "TypeScript": { "tab_size": 2, "hard_tabs": false },
+    "JSON": { "tab_size": 2, "hard_tabs": false },
+    "YAML": { "tab_size": 2, "hard_tabs": false },
+    "Lua": { "tab_size": 2, "hard_tabs": false },
+    "Markdown": { "soft_wrap": "editor_width" }
+  },
+
+  // ── Vim mode ───────────────────────────────────────────
+  "vim_mode": true,
+  "vim": {
+    "use_system_clipboard": "always"
+  },
+
+  // ── Project panel ──────────────────────────────────────
+  "project_panel": {
+    "dock": "left",
+    "default_width": 260,
+    "git_status": true
+  },
+
+  // ── Collaboration ──────────────────────────────────────
+  "telemetry": {
+    "diagnostics": false,
+    "metrics": false
+  },
+
+  // ── Assistant ──────────────────────────────────────────
+  "assistant": {
+    "enabled": true,
+    "version": "2"
+  }
+}

@@ -1,0 +1,37 @@
+[
+  {
+    "context": "Editor && VimControl && !VimWaiting && !menu",
+    "bindings": {
+      // Centered scrolling
+      "ctrl-d": ["editor::MovePageDown", "editor::ScrollCursorCenter"],
+      "ctrl-u": ["editor::MovePageUp", "editor::ScrollCursorCenter"],
+
+      // Quick save
+      "space w": "editor::Save",
+
+      // Split navigation
+      "ctrl-h": ["workspace::ActivatePaneInDirection", "Left"],
+      "ctrl-l": ["workspace::ActivatePaneInDirection", "Right"],
+      "ctrl-j": ["workspace::ActivatePaneInDirection", "Down"],
+      "ctrl-k": ["workspace::ActivatePaneInDirection", "Up"]
+    }
+  },
+  {
+    "context": "Editor && vim_mode == normal",
+    "bindings": {
+      // Leader keybindings (space)
+      "space e": "project_panel::ToggleFocus",
+      "space f f": "file_finder::Toggle",
+      "space f g": "search::ToggleSearch",
+      "space b d": "pane::CloseActiveItem",
+      "space q q": "zed::Quit"
+    }
+  },
+  {
+    "context": "Terminal",
+    "bindings": {
+      "ctrl-h": ["workspace::ActivatePaneInDirection", "Left"],
+      "ctrl-l": ["workspace::ActivatePaneInDirection", "Right"]
+    }
+  }
+]

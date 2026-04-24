@@ -1,0 +1,79 @@
+[user]
+	email = Briankhanglam@gmail.com
+	name = QuiteTall
+
+[core]
+	editor = nvim
+	autocrlf = input
+	pager = delta
+
+[interactive]
+	diffFilter = delta --color-only
+
+[delta]
+	navigate = true
+	side-by-side = true
+	line-numbers = true
+	syntax-theme = base16
+	dark = true
+	minus-style = syntax "#2d0a10"
+	minus-emph-style = syntax "#5e1523"
+	plus-style = syntax "#0d2612"
+	plus-emph-style = syntax "#1a4a28"
+	line-numbers-minus-style = "#c4746e"
+	line-numbers-plus-style = "#87a987"
+	line-numbers-zero-style = "#625e5a"
+	hunk-header-decoration-style = "#54546d" ul
+	hunk-header-style = syntax bold italic
+	file-style = "#c8c093" bold
+	file-decoration-style = "#54546d" ul
+	commit-decoration-style = "#c8c093" bold box
+
+[alias]
+	st = status
+	co = checkout
+	br = branch
+	ci = commit
+	lg = log --oneline --graph --decorate --all
+	last = log -1 HEAD
+	unstage = reset HEAD --
+	amend = commit --amend --no-edit
+	wip = !git add -A && git commit -m \"WIP\"
+	undo = reset --soft HEAD~1
+
+[push]
+	autoSetupRemote = true
+	default = current
+
+[pull]
+	rebase = true
+
+[merge]
+	conflictstyle = zdiff3
+
+[diff]
+	algorithm = histogram
+	colorMoved = default
+
+[rerere]
+	enabled = true
+
+[init]
+	defaultBranch = main
+
+[credential]
+	helper = store
+
+[credential "https://github.com"]
+	helper =
+	helper = !/usr/bin/gh auth git-credential
+
+[credential "https://gist.github.com"]
+	helper =
+	helper = !/usr/bin/gh auth git-credential
+
+[filter "lfs"]
+	required = true
+	clean = git-lfs clean -- %f
+	smudge = git-lfs smudge -- %f
+	process = git-lfs filter-process

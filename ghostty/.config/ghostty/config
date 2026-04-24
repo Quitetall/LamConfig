@@ -1,0 +1,42 @@
+# ╔═══════════════════════════════════════════╗
+# ║         Ghostty — Kanagawa Dragon         ║
+# ╚═══════════════════════════════════════════╝
+
+# --- Font ---
+font-family = "Intel One Mono"
+font-size = 14
+font-feature = +calt
+font-feature = +liga
+font-feature = +ss01
+
+theme = Kanagawa Wave
+
+# --- Cursor ---
+cursor-style = bar
+cursor-style-blink = true
+cursor-color = #c4746e
+
+# --- Window ---
+window-height = 72
+window-width = 128
+window-position-x = 1
+window-position-y = 1
+window-padding-x = 12
+window-padding-y = 10
+window-decoration = true
+window-title-font-family = "Inter"
+
+# --- Scrollback ---
+scrollback-limit = 10000
+
+# --- Shell Integration ---
+shell-integration = zsh
+shell-integration-features = cursor,sudo,title
+
+# --- Misc ---
+mouse-hide-while-typing = true
+copy-on-select = clipboard
+confirm-close-surface = false
+quit-after-last-window-closed = true
+
+command = bash -c 'fastfetch; exec zsh'

@@ -1,0 +1,124 @@
+{
+  "logo": {
+    "type": "kitty-direct",
+    "source": "~/.config/fastfetch/dragon.png",
+    "width": 48,
+    "height": 24,
+    "padding": {
+      "top": 1,
+      "left": 1,
+      "right": 2
+    }
+  },
+  "display": {
+    "color": {
+      "keys": "#C4746E",
+      "title": "#8BA4B0"
+    }
+  },
+  "modules": [
+    {
+      "type": "title",
+      "format": "{user-name}@{host-name}"
+    },
+    { "type": "separator" },
+    {
+      "type": "os",
+      "key": " OS          "
+    },
+    {
+      "type": "host",
+      "key": " Host        "
+    },
+    {
+      "type": "kernel",
+      "key": " Kernel      ",
+      "format": "{version}"
+    },
+    {
+      "type": "wm",
+      "key": " WM          "
+    },
+    {
+      "type": "wmtheme",
+      "key": " WM Theme    "
+    },
+    {
+      "type": "icons",
+      "key": " Icons       ",
+      "format": "{1}"
+    },
+    {
+      "type": "cursor",
+      "key": " Cursor      "
+    },
+    {
+      "type": "font",
+      "key": " Font        ",
+      "format": "{1}"
+    },
+    {
+      "type": "terminal",
+      "key": " Terminal    "
+    },
+    { "type": "separator" },
+    {
+      "type": "cpu",
+      "key": " CPU         "
+    },
+    {
+      "type": "gpu",
+      "key": "󰍛 GPU         ",
+      "detectionMethod": "pci",
+      "hideType": "integrated",
+      "format": "{name}"
+    },
+    {
+      "type": "memory",
+      "key": " RAM         "
+    },
+    {
+      "type": "disk",
+      "key": "󰋊 Root        ",
+      "folders": "/"
+    },
+    {
+      "type": "disk",
+      "key": "󰋊 2TB         ",
+      "folders": "/mnt/2tb"
+    },
+    {
+      "type": "disk",
+      "key": "󰋊 4TB         ",
+      "folders": "/mnt/4tb"
+    },
+    { "type": "separator" },
+    {
+      "type": "packages",
+      "key": " Packages    "
+    },
+    {
+      "type": "uptime",
+      "key": "󰅐 Uptime      "
+    },
+    {
+      "type": "shell",
+      "key": " Shell       "
+    },
+    {
+      "type": "localip",
+      "key": "󰩟 Local IP    ",
+      "showIpv4": true,
+      "showIpv6": false
+    },
+    { "type": "separator" },
+    {
+      "type": "colors",
+      "paddingLeft": 0,
+      "symbol": "circle",
+      "count": 16,
+      "width": 5,
+      "height": 5
+    }
+  ]
+}
