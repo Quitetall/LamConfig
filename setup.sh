@@ -3,181 +3,66 @@ set -euo pipefail
 
 # ╔═══════════════════════════════════════════════════════╗
 # ║  LamConfig Setup — Full System Bootstrap             ║
-# ║  Modular installer for any Linux distro              ║
+# ║  Usage: setup.sh [--all] [--dev] [--gaming] ...     ║
+# ║         setup.sh --cli=lightweight|standard|extended ║
 # ╚═══════════════════════════════════════════════════════╝
 
-# ── Colors ────────────────────────────────────────────────
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-CYAN='\033[0;36m'
-YELLOW='\033[0;33m'
-BOLD='\033[1m'
-DIM='\033[2m'
-NC='\033[0m'
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-info()  { echo -e "${CYAN}[*]${NC} $1"; }
-ok()    { echo -e "${GREEN}[+]${NC} $1"; }
-warn()  { echo -e "${YELLOW}[!]${NC} $1"; }
-fail()  { echo -e "${RED}[-]${NC} $1"; }
-header() { echo -e "\n${BOLD}${CYAN}═══ $1 ═══${NC}\n"; }
+source "$SCRIPT_DIR/lib/utils.sh"
+source "$SCRIPT_DIR/lib/detect.sh"
+source "$SCRIPT_DIR/lib/pkgmap.sh"
 
-# ── Distro detection ──────────────────────────────────────
-detect_distro() {
-    if [[ -f /etc/os-release ]]; then
-        . /etc/os-release
-        case "$ID" in
-            arch|cachyos|endeavouros|manjaro|garuda|artix)
-                DISTRO="arch" ;;
-            ubuntu|debian|pop|linuxmint|elementary|zorin)
-                DISTRO="debian" ;;
-            fedora|nobara|ultramarine)
-                DISTRO="fedora" ;;
-            opensuse*|sles)
-                DISTRO="suse" ;;
-            void)
-                DISTRO="void" ;;
-            *)
-                warn "Unknown distro: $ID. Attempting Arch-style install."
-                DISTRO="arch" ;;
-        esac
-    else
-        fail "Cannot detect distro"
-        exit 1
-    fi
-    ok "Detected: $PRETTY_NAME ($DISTRO family)"
-}
-
-# ── Package manager abstraction ───────────────────────────
-pkg_install() {
-    local pkgs=("$@")
-    [[ ${#pkgs[@]} -eq 0 ]] && return
-    case "$DISTRO" in
-        arch)
-            if command -v paru &>/dev/null; then
-                paru -S --needed --noconfirm "${pkgs[@]}" 2>/dev/null || true
-            elif command -v yay &>/dev/null; then
-                yay -S --needed --noconfirm "${pkgs[@]}" 2>/dev/null || true
-            else
-                sudo pacman -S --needed --noconfirm "${pkgs[@]}" 2>/dev/null || true
-            fi
-            ;;
-        debian)
-            sudo apt-get update -qq
-            sudo apt-get install -y "${pkgs[@]}" 2>/dev/null || true
-            ;;
-        fedora)
-            sudo dnf install -y "${pkgs[@]}" 2>/dev/null || true
-            ;;
-        suse)
-            sudo zypper install -y "${pkgs[@]}" 2>/dev/null || true
-            ;;
-        void)
-            sudo xbps-install -Sy "${pkgs[@]}" 2>/dev/null || true
-            ;;
-    esac
-}
-
-pkg_map() {
-    case "$DISTRO" in
-        arch)   echo "$1" ;;
-        debian) echo "${2:-$1}" ;;
-        fedora) echo "${3:-${2:-$1}}" ;;
-        *)      echo "$1" ;;
-    esac
-}
-
-# ── AUR helper install (Arch only) ────────────────────────
-install_aur_helper() {
-    if [[ "$DISTRO" != "arch" ]]; then return; fi
-    if command -v paru &>/dev/null || command -v yay &>/dev/null; then
-        ok "AUR helper already installed"
-        return
-    fi
-    info "Installing paru (AUR helper)..."
-    sudo pacman -S --needed --noconfirm base-devel git
-    local tmpdir
-    tmpdir=$(mktemp -d)
-    git clone https://aur.archlinux.org/paru.git "$tmpdir/paru"
-    (cd "$tmpdir/paru" && makepkg -si --noconfirm)
-    rm -rf "$tmpdir"
-    ok "paru installed"
-}
-
-# ── Flatpak setup (non-Arch fallback for GUI apps) ────────
-ensure_flatpak() {
-    if ! command -v flatpak &>/dev/null; then
-        info "Installing Flatpak..."
-        pkg_install flatpak
-    fi
-    flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo 2>/dev/null || true
-}
+# CLI tier selection (default: standard)
+CLI_TIER="${CLI_TIER:-standard}"
 
 # ══════════════════════════════════════════════════════════
-#  CATEGORY: Core CLI Tools
+#  CATEGORY: Core CLI Tools  (tiered)
 # ══════════════════════════════════════════════════════════
+#
+#  lightweight — bare minimum on any machine
+#  standard    — comfortable power-user setup  (default)
+#  extended    — full comfort / rarely needed extras
+
+CLI_LIGHTWEIGHT=(
+    git curl wget zsh
+    neovim tmux
+    fzf ripgrep fd bat eza zoxide
+    jq stow openssh rsync
+    less tar unzip zip
+)
+
+CLI_STANDARD=(
+    "${CLI_LIGHTWEIGHT[@]}"
+    # Git
+    git-lfs git-delta github-cli
+    # TUI / navigation
+    lazygit yazi btop fastfetch
+    # Misc tools
+    tree p7zip zstd pv bind
+)
+
+CLI_EXTENDED=(
+    "${CLI_STANDARD[@]}"
+    # Extra editors
+    vim micro
+    # Alternative multiplexer
+    zellij
+    # Extra monitoring / search
+    htop duf ugrep plocate
+    # System utils
+    perl diffutils which inetutils
+    # Archive
+    unrar
+)
+
 install_cli_tools() {
-    header "Core CLI Tools"
+    header "Core CLI Tools  [tier: ${CLI_TIER}]"
 
-    # ── Essentials ──
-    pkg_install \
-        $(pkg_map git git git) \
-        $(pkg_map curl curl curl) \
-        $(pkg_map wget wget wget) \
-        $(pkg_map less less less) \
-        $(pkg_map which which which) \
-        $(pkg_map diffutils diffutils diffutils) \
-        $(pkg_map perl perl perl)
+    local -n tier_pkgs="CLI_${CLI_TIER^^}"
+    pkgs_install "${tier_pkgs[@]}"
 
-    # ── Compression ──
-    pkg_install \
-        $(pkg_map unzip unzip unzip) \
-        $(pkg_map zip zip zip) \
-        $(pkg_map tar tar tar) \
-        $(pkg_map p7zip p7zip-full p7zip) \
-        $(pkg_map zstd zstd zstd) \
-        $(pkg_map unrar unrar unrar)
-
-    # ── Modern CLI replacements ──
-    pkg_install \
-        $(pkg_map neovim neovim neovim) \
-        $(pkg_map vim vim-enhanced vim) \
-        $(pkg_map micro micro micro) \
-        $(pkg_map tmux tmux tmux) \
-        $(pkg_map zsh zsh zsh) \
-        $(pkg_map fzf fzf fzf) \
-        $(pkg_map ripgrep ripgrep ripgrep) \
-        $(pkg_map fd fd-find fd-find) \
-        $(pkg_map bat bat bat) \
-        $(pkg_map eza eza eza) \
-        $(pkg_map git-delta git-delta git-delta) \
-        $(pkg_map zoxide zoxide zoxide) \
-        $(pkg_map btop btop btop) \
-        $(pkg_map fastfetch fastfetch fastfetch) \
-        $(pkg_map stow stow stow) \
-        $(pkg_map lazygit lazygit lazygit) \
-        $(pkg_map yazi yazi yazi) \
-        $(pkg_map zellij zellij zellij) \
-        $(pkg_map jq jq jq) \
-        $(pkg_map pv pv pv) \
-        $(pkg_map tree tree tree) \
-        $(pkg_map duf duf duf) \
-        $(pkg_map htop htop htop) \
-        $(pkg_map ugrep ugrep ugrep) \
-        $(pkg_map plocate plocate mlocate)
-
-    # ── Git extras ──
-    pkg_install \
-        $(pkg_map github-cli gh gh) \
-        $(pkg_map git-lfs git-lfs git-lfs)
-
-    # ── Networking ──
-    pkg_install \
-        $(pkg_map openssh openssh-client openssh-clients) \
-        $(pkg_map rsync rsync rsync) \
-        $(pkg_map inetutils inetutils net-tools) \
-        $(pkg_map bind bind9-dnsutils bind-utils)
-
-    ok "CLI tools installed"
+    ok "CLI tools installed (${CLI_TIER})"
 }
 
 # ══════════════════════════════════════════════════════════
@@ -186,132 +71,97 @@ install_cli_tools() {
 install_dev() {
     header "Development Tools"
 
-    # ── Build essentials ──
-    info "Installing build tools..."
+    # ── Build essentials ──────────────────────────────────
+    info "Build tools..."
     case "$DISTRO" in
-        arch)
-            pkg_install base-devel cmake ninja gdb lldb clang lld ccache mold
-            ;;
-        debian)
-            pkg_install build-essential cmake ninja-build gdb lldb clang lld ccache mold
-            ;;
-        fedora)
-            pkg_install gcc gcc-c++ make cmake ninja-build gdb lldb clang lld ccache mold
-            ;;
+        arch)   pkg_install base-devel cmake ninja gdb lldb clang lld ccache mold ;;
+        debian) pkg_install build-essential cmake ninja-build gdb lldb clang lld ccache mold ;;
+        fedora) pkg_install gcc gcc-c++ make cmake ninja-build gdb lldb clang lld ccache mold ;;
     esac
 
-    # ── Python ──
-    info "Installing Python..."
+    # ── Python ───────────────────────────────────────────
+    info "Python..."
     case "$DISTRO" in
         arch)
-            pkg_install \
-                python python-pip python-virtualenv python-pipx \
-                python-pynvim python-scipy python-packaging \
-                uv
-            ;;
+            pkg_install python python-pip python-virtualenv python-pipx \
+                        python-pynvim uv ;;
         debian)
-            pkg_install \
-                python3 python3-pip python3-venv python3-dev \
-                python3-pynvim python3-scipy pipx
-            ;;
+            pkg_install python3 python3-pip python3-venv python3-dev \
+                        python3-pynvim pipx ;;
         fedora)
-            pkg_install \
-                python3 python3-pip python3-virtualenv python3-devel \
-                python3-pynvim python3-scipy pipx
-            ;;
+            pkg_install python3 python3-pip python3-virtualenv python3-devel \
+                        python3-pynvim pipx ;;
     esac
 
-    # ── Dev utilities ──
-    info "Installing dev utilities..."
-    pkg_install \
-        $(pkg_map hyperfine hyperfine hyperfine) \
-        $(pkg_map just just just) \
-        $(pkg_map meld meld meld)
+    # ── Dev utilities ─────────────────────────────────────
+    info "Dev utilities..."
+    pkgs_install hyperfine just meld
 
-    # ── Containers ──
-    info "Installing container tools..."
+    # ── Containers ───────────────────────────────────────
+    info "Containers..."
     case "$DISTRO" in
         arch)   pkg_install podman-docker podman-compose lazydocker ;;
         debian) pkg_install podman podman-compose ;;
         fedora) pkg_install podman podman-compose ;;
     esac
 
-    # ── Virtualization ──
-    info "Installing virtualization..."
-    pkg_install $(pkg_map virt-manager virt-manager virt-manager)
+    # ── Virtualization ───────────────────────────────────
+    info "Virtualization..."
+    pkgs_install virt-manager
 
-    # ── Embedded / Cross-compilation ──
-    info "Installing embedded toolchains..."
+    # ── Embedded / RISC-V ────────────────────────────────
+    info "Embedded toolchains..."
     case "$DISTRO" in
         arch)
-            pkg_install \
-                riscv64-elf-gcc riscv64-elf-newlib \
-                valgrind \
-                openocd
-            ;;
+            pkg_install riscv64-elf-gcc riscv64-elf-newlib valgrind openocd ;;
         debian)
-            pkg_install \
-                gcc-riscv64-unknown-elf \
-                valgrind \
-                openocd
-            ;;
+            pkg_install gcc-riscv64-unknown-elf valgrind openocd ;;
         fedora)
-            pkg_install \
-                gcc-riscv64-linux-gnu \
-                valgrind \
-                openocd
-            ;;
+            pkg_install gcc-riscv64-linux-gnu valgrind openocd ;;
     esac
 
-    # ── CUDA (Arch only, needs nvidia) ──
+    # ── CUDA (Arch + NVIDIA only) ─────────────────────────
     if [[ "$DISTRO" == "arch" ]]; then
-        info "Installing CUDA..."
-        pkg_install cuda
+        info "CUDA..."
+        pkg_install cuda 2>/dev/null || warn "CUDA install failed — needs nvidia driver"
     fi
 
-    # ── .NET ──
-    info "Installing .NET..."
-    pkg_install \
-        $(pkg_map dotnet-sdk dotnet-sdk-8.0 dotnet-sdk-8.0) \
-        $(pkg_map dotnet-runtime dotnet-runtime-8.0 dotnet-runtime-8.0)
+    # ── .NET ─────────────────────────────────────────────
+    info ".NET..."
+    pkgs_install dotnet-sdk dotnet-runtime
 
-    # ── PyTorch (Arch has system packages) ──
+    # ── PyTorch (Arch system packages) ───────────────────
     if [[ "$DISTRO" == "arch" ]]; then
-        info "Installing PyTorch..."
-        pkg_install python-pytorch python-pytorch-cuda 2>/dev/null || \
-            pkg_install python-pytorch
+        info "PyTorch..."
+        pkg_install python-pytorch-cuda 2>/dev/null || pkg_install python-pytorch
     fi
 
-    # ── Cloud tools ──
-    info "Installing cloud tools..."
+    # ── Cloud / AI ───────────────────────────────────────
+    info "Cloud + AI tools..."
     case "$DISTRO" in
         arch)   pkg_install aws-cli s3cmd s5cmd-bin ;;
-        debian) pkg_install awscli s3cmd ;;
-        fedora) pkg_install awscli s3cmd ;;
+        *)      pkg_install awscli s3cmd ;;
     esac
-
-    # ── AI / LLM ──
-    info "Installing AI tools..."
-    pkg_install $(pkg_map ollama ollama ollama)
+    pkgs_install ollama
 
     ok "Dev tools installed"
 }
 
-# ── Toolchains ────────────────────────────────────────────
-
+# ══════════════════════════════════════════════════════════
+#  TOOLCHAINS
+# ══════════════════════════════════════════════════════════
 install_toolchain_rust() {
     header "Rust Toolchain"
     if command -v rustup &>/dev/null; then
-        ok "Rust already installed ($(rustc --version 2>/dev/null || echo 'no rustc'))"
+        ok "Rust already installed — updating..."
         rustup update 2>/dev/null || true
-    else
-        info "Installing Rust via rustup..."
-        case "$DISTRO" in
-            arch)   pkg_install rustup && rustup default stable ;;
-            *)      curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y ;;
-        esac
-        [[ -f "$HOME/.cargo/env" ]] && source "$HOME/.cargo/env"
+        return
     fi
+    case "$DISTRO" in
+        arch) pkg_install rustup && rustup default stable ;;
+        *)    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y ;;
+    esac
+    [[ -f "$HOME/.cargo/env" ]] && source "$HOME/.cargo/env"
     ok "Rust ready"
 }
 
@@ -320,15 +170,13 @@ install_toolchain_node() {
     if command -v node &>/dev/null; then
         ok "Node already installed ($(node --version))"
     else
-        info "Installing Node.js..."
         case "$DISTRO" in
-            arch)   pkg_install nodejs npm ;;
+            arch) pkg_install nodejs npm ;;
             *)
                 curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
                 export NVM_DIR="$HOME/.nvm"
-                [ -s "$NVM_DIR/nvm.sh" ] && source "$NVM_DIR/nvm.sh"
-                nvm install --lts
-                ;;
+                [[ -s "$NVM_DIR/nvm.sh" ]] && source "$NVM_DIR/nvm.sh"
+                nvm install --lts ;;
         esac
     fi
     mkdir -p "$HOME/.npm-global"
@@ -341,8 +189,7 @@ install_toolchain_go() {
     if command -v go &>/dev/null; then
         ok "Go already installed ($(go version))"
     else
-        info "Installing Go..."
-        pkg_install $(pkg_map go golang golang)
+        pkgs_install go
     fi
     ok "Go ready"
 }
@@ -354,12 +201,11 @@ install_claude_code() {
         return
     fi
     if ! command -v npm &>/dev/null; then
-        warn "Node.js required for Claude Code. Install Node first."
+        warn "Node.js required — install Node first (option n)"
         return
     fi
-    info "Installing Claude Code..."
     npm install -g @anthropic-ai/claude-code
-    ok "Claude Code installed. Run 'claude' to authenticate."
+    ok "Claude Code installed — run 'claude' to authenticate"
 }
 
 # ══════════════════════════════════════════════════════════
@@ -370,65 +216,52 @@ install_productivity() {
 
     case "$DISTRO" in
         arch)
-            # ── Browsers ──
+            # Browsers
             pkg_install firefox
-            pkg_install firefox-nightly-bin google-chrome-canary torbrowser-launcher 2>/dev/null || true
+            pkg_install torbrowser-launcher 2>/dev/null || true
 
-            # ── Terminals & editors ──
+            # Terminals + editors
             pkg_install ghostty zed
-            pkg_install emacs 2>/dev/null || true
 
-            # ── Communication ──
+            # Communication
             pkg_install vesktop 2>/dev/null || pkg_install discord
 
-            # ── Notes & docs ──
-            pkg_install obsidian anki libreoffice-fresh
+            # Notes + study
+            pkg_install obsidian anki
 
-            # ── Media ──
-            pkg_install vlc-plugins-all mpv obs-studio audacity haruna
+            # Office
+            pkg_install libreoffice-fresh
+
+            # Media
+            pkg_install vlc mpv obs-studio audacity
             pkg_install spotify-launcher 2>/dev/null || true
 
-            # ── Creative ──
-            pkg_install gimp inkscape krita krita-plugin-gmic kdenlive blender freecad
-            pkg_install birdfont 2>/dev/null || true
+            # Creative
+            pkg_install gimp inkscape krita kdenlive blender
 
-            # ── Utilities ──
+            # Desktop utilities
             pkg_install \
-                flameshot spectacle peek variety \
-                ark file-roller thunar dolphin kate \
-                kcalc filelight meld \
+                flameshot spectacle \
+                ark thunar dolphin \
                 wl-clipboard xdg-utils xdg-user-dirs
 
-            # ── API / Downloads ──
-            pkg_install bruno-bin jdownloader2 2>/dev/null || true
+            # Dev GUI
+            pkg_install bruno-bin 2>/dev/null || true
             ;;
-        debian)
+
+        debian|fedora)
             pkg_install \
                 firefox vlc mpv obs-studio audacity \
                 gimp inkscape krita kdenlive blender \
-                libreoffice flameshot thunar dolphin kate \
-                ark file-roller wl-clipboard xdg-utils \
-                emacs
+                libreoffice flameshot thunar dolphin \
+                ark wl-clipboard xdg-utils
 
             ensure_flatpak
-            flatpak install -y flathub com.discordapp.Discord 2>/dev/null || true
-            flatpak install -y flathub md.obsidian.Obsidian 2>/dev/null || true
-            flatpak install -y flathub com.spotify.Client 2>/dev/null || true
-            flatpak install -y flathub net.ankiweb.Anki 2>/dev/null || true
-            ;;
-        fedora)
-            pkg_install \
-                firefox vlc mpv obs-studio audacity \
-                gimp inkscape krita kdenlive blender \
-                libreoffice flameshot thunar dolphin kate \
-                ark file-roller wl-clipboard xdg-utils \
-                emacs
-
-            ensure_flatpak
-            flatpak install -y flathub com.discordapp.Discord 2>/dev/null || true
-            flatpak install -y flathub md.obsidian.Obsidian 2>/dev/null || true
-            flatpak install -y flathub com.spotify.Client 2>/dev/null || true
-            flatpak install -y flathub net.ankiweb.Anki 2>/dev/null || true
+            flatpak install -y flathub com.discordapp.Discord    2>/dev/null || true
+            flatpak install -y flathub md.obsidian.Obsidian      2>/dev/null || true
+            flatpak install -y flathub com.spotify.Client        2>/dev/null || true
+            flatpak install -y flathub net.ankiweb.Anki          2>/dev/null || true
+            flatpak install -y flathub io.usebruno.Bruno         2>/dev/null || true
             ;;
     esac
 
@@ -443,14 +276,14 @@ install_gaming() {
 
     case "$DISTRO" in
         arch)
-            # Enable multilib if not already
+            # Enable multilib
             if ! grep -q "^\[multilib\]" /etc/pacman.conf; then
-                warn "Enabling multilib repository..."
+                warn "Enabling multilib..."
                 sudo sed -i '/\[multilib\]/,/Include/s/^#//' /etc/pacman.conf
                 sudo pacman -Sy
             fi
 
-            # ── Core gaming stack ──
+            # Core gaming stack
             pkg_install \
                 steam lutris \
                 wine-staging wine-mono wine-gecko winetricks \
@@ -458,45 +291,38 @@ install_gaming() {
                 mangohud lib32-mangohud \
                 gamescope
 
-            # ── GPU / Vulkan ──
+            # GPU / Vulkan
             pkg_install \
                 vulkan-icd-loader lib32-vulkan-icd-loader vulkan-tools \
-                lib32-nvidia-utils lib32-opencl-nvidia \
                 nvidia-utils nvidia-settings opencl-nvidia \
-                libva-nvidia-driver egl-wayland mesa-utils
+                lib32-nvidia-utils lib32-opencl-nvidia \
+                libva-nvidia-driver egl-wayland
 
-            # Also install Intel Vulkan if hybrid GPU
-            pkg_install vulkan-intel lib32-vulkan-intel libva-intel-driver 2>/dev/null || true
+            pkg_install vulkan-intel lib32-vulkan-intel 2>/dev/null || true
 
-            # ── AUR gaming extras ──
+            # AUR extras
             pkg_install \
                 proton-ge-custom-bin \
                 heroic-games-launcher-bin \
                 protonup-qt \
                 prismlauncher \
-                osu-lazer-bin \
-                modrinth-app-bin \
-                lug-helper \
-                sunshine \
-                hidamari \
-                winboat-bin \
                 2>/dev/null || true
             ;;
+
         debian)
             sudo dpkg --add-architecture i386
             sudo apt-get update -qq
-
             pkg_install \
                 steam-installer lutris \
                 wine winetricks \
                 gamemode mangohud \
-                mesa-vulkan-drivers mesa-vulkan-drivers:i386 \
-                vulkan-tools
+                mesa-vulkan-drivers vulkan-tools
 
             ensure_flatpak
             flatpak install -y flathub com.heroicgameslauncher.hgl 2>/dev/null || true
             flatpak install -y flathub org.prismlauncher.PrismLauncher 2>/dev/null || true
             ;;
+
         fedora)
             # RPM Fusion
             sudo dnf install -y \
@@ -504,11 +330,7 @@ install_gaming() {
                 "https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-$(rpm -E %fedora).noarch.rpm" \
                 2>/dev/null || true
 
-            pkg_install \
-                steam lutris \
-                wine winetricks \
-                gamemode mangohud \
-                vulkan-tools gamescope
+            pkg_install steam lutris wine winetricks gamemode mangohud vulkan-tools gamescope
 
             ensure_flatpak
             flatpak install -y flathub com.heroicgameslauncher.hgl 2>/dev/null || true
@@ -525,114 +347,84 @@ install_gaming() {
 install_system() {
     header "System, Fonts & Hardware"
 
-    # ── Fonts ──
-    info "Installing fonts..."
+    # ── Fonts ─────────────────────────────────────────────
+    info "Fonts..."
     case "$DISTRO" in
         arch)
             pkg_install \
                 ttf-jetbrains-mono-nerd ttf-meslo-nerd otf-monaspace-nerdfonts \
                 ttf-intel-one-mono inter-font \
-                ttf-dejavu ttf-liberation ttf-bitstream-vera ttf-opensans \
-                cantarell-fonts awesome-terminal-fonts \
+                ttf-dejavu ttf-liberation \
                 noto-fonts noto-fonts-cjk noto-fonts-emoji \
-                papirus-icon-theme phinger-cursors
+                cantarell-fonts papirus-icon-theme phinger-cursors
             ;;
         debian)
             pkg_install \
-                fonts-jetbrains-mono fonts-firacode \
-                fonts-noto fonts-noto-cjk fonts-noto-color-emoji \
-                fonts-dejavu fonts-liberation \
-                papirus-icon-theme
+                fonts-jetbrains-mono fonts-firacode fonts-noto \
+                fonts-noto-cjk fonts-noto-color-emoji \
+                fonts-dejavu fonts-liberation papirus-icon-theme
             ;;
         fedora)
             pkg_install \
                 jetbrains-mono-fonts fira-code-fonts \
-                google-noto-fonts-common google-noto-cjk-fonts google-noto-emoji-fonts \
-                dejavu-sans-fonts liberation-fonts \
-                papirus-icon-theme
+                google-noto-fonts-common google-noto-cjk-fonts \
+                google-noto-emoji-fonts dejavu-sans-fonts \
+                liberation-fonts papirus-icon-theme
             ;;
     esac
     fc-cache -f 2>/dev/null || true
 
-    # ── System tools ──
-    info "Installing system tools..."
+    # ── System tools ──────────────────────────────────────
+    info "System tools..."
     case "$DISTRO" in
         arch)
             pkg_install \
                 man-db man-pages bash-completion \
-                reflector pkgfile pacman-contrib rebuild-detector \
-                smartmontools hdparm lsb-release dmidecode \
-                hwinfo hwdetect lsscsi usbutils \
-                fwupd upower cpupower \
-                power-profiles-daemon \
-                profile-sync-daemon
+                reflector pkgfile pacman-contrib \
+                smartmontools hdparm dmidecode usbutils \
+                fwupd upower cpupower power-profiles-daemon \
+                lsb-release hwinfo
             ;;
         debian)
             pkg_install \
-                man-db manpages-dev bash-completion \
-                smartmontools hdparm lsb-release dmidecode \
-                hwinfo usbutils \
-                fwupd upower cpupower-gui \
-                power-profiles-daemon
+                man-db bash-completion \
+                smartmontools hdparm dmidecode usbutils \
+                fwupd upower power-profiles-daemon lsb-release
             ;;
         fedora)
             pkg_install \
-                man-db man-pages bash-completion \
-                smartmontools hdparm lsb_release dmidecode \
-                hwinfo usbutils \
-                fwupd upower kernel-tools \
-                power-profiles-daemon
+                man-db bash-completion \
+                smartmontools hdparm dmidecode usbutils \
+                fwupd upower kernel-tools power-profiles-daemon
             ;;
     esac
 
-    # ── Bluetooth ──
-    info "Installing Bluetooth..."
-    pkg_install \
-        $(pkg_map bluez bluez bluez) \
-        $(pkg_map bluez-utils bluez-tools bluez-tools) \
-        $(pkg_map bluez-libs libbluetooth-dev bluez-libs-devel) \
-        $(pkg_map bluez-obex bluez-obexd bluez-obex) \
-        $(pkg_map bluez-hid2hci bluez-hid2hci bluez-hid2hci)
+    # ── Bluetooth ────────────────────────────────────────
+    info "Bluetooth..."
+    case "$DISTRO" in
+        arch)   pkg_install bluez bluez-utils bluez-libs bluez-obex ;;
+        debian) pkg_install bluez bluez-tools libbluetooth-dev ;;
+        fedora) pkg_install bluez bluez-tools bluez-libs-devel ;;
+    esac
 
-    # ── Audio (PipeWire) ──
-    info "Installing audio stack..."
+    # ── Audio (PipeWire) ─────────────────────────────────
+    info "Audio..."
     case "$DISTRO" in
         arch)   pkg_install pipewire-alsa pipewire-pulse wireplumber pavucontrol sof-firmware ;;
         debian) pkg_install pipewire pipewire-pulse wireplumber pavucontrol firmware-sof-signed ;;
         fedora) pkg_install pipewire pipewire-pulseaudio wireplumber pavucontrol ;;
     esac
 
-    # ── Printing ──
-    info "Installing printing..."
-    pkg_install \
-        $(pkg_map cups cups cups) \
-        $(pkg_map cups-filters cups-filters cups-filters) \
-        $(pkg_map cups-pdf cups-pdf cups-pdf) \
-        $(pkg_map system-config-printer system-config-printer system-config-printer) \
-        $(pkg_map ghostscript ghostscript ghostscript)
-    case "$DISTRO" in
-        arch) pkg_install gutenprint foomatic-db foomatic-db-engine \
-                foomatic-db-ppds foomatic-db-nonfree foomatic-db-nonfree-ppds \
-                foomatic-db-gutenprint-ppds splix gsfonts ;;
-    esac
-
-    # ── Filesystems ──
-    info "Installing filesystem tools..."
+    # ── Filesystems ──────────────────────────────────────
+    info "Filesystem tools..."
     case "$DISTRO" in
         arch)
             pkg_install \
-                btrfs-progs e2fsprogs xfsprogs jfsutils f2fs-tools \
-                ntfs-3g exfatprogs dosfstools \
-                nilfs-utils dmraid lvm2 cryptsetup mdadm \
-                mtools fsarchiver
-            ;;
-        debian)
-            pkg_install \
                 btrfs-progs e2fsprogs xfsprogs \
                 ntfs-3g exfatprogs dosfstools \
                 lvm2 cryptsetup mdadm
             ;;
-        fedora)
+        debian|fedora)
             pkg_install \
                 btrfs-progs e2fsprogs xfsprogs \
                 ntfs-3g exfatprogs dosfstools \
@@ -640,97 +432,84 @@ install_system() {
             ;;
     esac
 
-    # ── Btrfs snapshots (Arch) ──
-    if [[ "$DISTRO" == "arch" ]]; then
+    # Btrfs snapshots (Arch)
+    [[ "$DISTRO" == "arch" ]] && \
         pkg_install snapper btrfs-assistant 2>/dev/null || true
-    fi
 
-    # ── Networking ──
-    info "Installing network tools..."
+    # ── Networking ───────────────────────────────────────
+    info "Network tools..."
     case "$DISTRO" in
         arch)
             pkg_install \
                 networkmanager networkmanager-openvpn \
-                iwd nss-mdns dnsmasq \
-                tailscale ufw xl2tpd \
+                iwd nss-mdns dnsmasq tailscale ufw \
                 modemmanager ethtool
             ;;
         debian)
             pkg_install \
                 network-manager network-manager-openvpn \
-                nss-mdns dnsmasq \
-                tailscale ufw \
+                nss-mdns dnsmasq tailscale ufw \
                 modemmanager ethtool
             ;;
         fedora)
             pkg_install \
                 NetworkManager NetworkManager-openvpn \
-                nss-mdns dnsmasq \
-                tailscale firewalld \
+                nss-mdns dnsmasq tailscale firewalld \
                 ModemManager ethtool
             ;;
     esac
 
-    # ── Boot / EFI (Arch) ──
-    if [[ "$DISTRO" == "arch" ]]; then
-        pkg_install \
-            efibootmgr efitools mkinitcpio os-prober \
-            plymouth 2>/dev/null || true
-    fi
-
-    # ── Multimedia codecs ──
-    info "Installing multimedia codecs..."
+    # ── Audio / Video codecs ─────────────────────────────
+    info "Multimedia codecs..."
     case "$DISTRO" in
         arch)
             pkg_install \
-                gst-libav gst-plugin-pipewire gst-plugin-va \
+                gst-libav gst-plugin-pipewire \
                 gst-plugins-bad gst-plugins-ugly \
-                libdvdcss libgsf libmythes libopenraw \
-                ffmpegthumbnailer ffmpegthumbs poppler-glib \
-                opus-tools sox frei0r-plugins \
-                intel-media-sdk libva-utils
+                ffmpegthumbnailer poppler-glib \
+                opus-tools intel-media-sdk libva-utils
             ;;
         debian)
-            pkg_install \
-                gstreamer1.0-libav gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly \
-                ffmpegthumbnailer \
-                ubuntu-restricted-extras 2>/dev/null || true
+            pkg_install gstreamer1.0-libav gstreamer1.0-plugins-bad \
+                        gstreamer1.0-plugins-ugly ffmpegthumbnailer 2>/dev/null || true
             ;;
         fedora)
-            pkg_install \
-                gstreamer1-plugin-libav gstreamer1-plugins-bad-free gstreamer1-plugins-ugly \
-                ffmpegthumbnailer
+            pkg_install gstreamer1-plugin-libav gstreamer1-plugins-bad-free \
+                        gstreamer1-plugins-ugly ffmpegthumbnailer
             ;;
     esac
 
-    # ── Wayland extras ──
-    pkg_install $(pkg_map wayland-protocols wayland-protocols wayland-protocols)
-    pkg_install $(pkg_map xsettingsd xsettingsd xsettingsd) 2>/dev/null || true
-
-    # ── KDE Plasma extras (Arch) ──
+    # ── KDE extras (Arch) ────────────────────────────────
     if [[ "$DISTRO" == "arch" ]]; then
-        info "Installing KDE extras..."
+        info "KDE extras..."
         pkg_install \
             plasma-desktop plasma-nm plasma-pa plasma-systemmonitor \
-            plasma-firewall plasma-thunderbolt plasma-browser-integration \
-            plasma-login-manager \
-            kdeplasma-addons powerdevil kinfocenter kscreen \
+            powerdevil kinfocenter kscreen \
             kde-gtk-config breeze-gtk \
             kdeconnect kwallet-pam kwalletmanager \
-            kdegraphics-thumbnailers \
-            phonon-qt6-vlc discover partitionmanager kio-admin \
-            konsole \
+            kdeplasma-addons kdegraphics-thumbnailers \
+            discover partitionmanager kio-admin konsole \
             2>/dev/null || true
     fi
 
-    # ── QMK (keyboard firmware) ──
-    pkg_install $(pkg_map qmk qmk-toolbox qmk) 2>/dev/null || true
+    # ── Wayland ──────────────────────────────────────────
+    pkgs_install wayland-protocols
+
+    # ── Printing ─────────────────────────────────────────
+    info "Printing..."
+    pkg_install cups cups-filters ghostscript system-config-printer
+    [[ "$DISTRO" == "arch" ]] && \
+        pkg_install gutenprint foomatic-db foomatic-db-engine \
+            foomatic-db-ppds foomatic-db-nonfree 2>/dev/null || true
+
+    # ── QMK (keyboard firmware) ──────────────────────────
+    pkgs_install qmk 2>/dev/null || true
 
     ok "System extras installed"
 }
 
 # ══════════════════════════════════════════════════════════
-#  CATEGORY: Dotfiles (configs)
+#  CATEGORY: Dotfiles
 # ══════════════════════════════════════════════════════════
 install_dotfiles() {
     header "Dotfiles & Configs"
@@ -739,16 +518,14 @@ install_dotfiles() {
     local REPO="https://github.com/Quitetall/LamConfig.git"
 
     if [[ -d "$DOTFILES" ]]; then
-        info "Dotfiles exist, pulling latest..."
+        info "Dotfiles exist — pulling latest..."
         git -C "$DOTFILES" pull
     else
         info "Cloning dotfiles..."
         git clone "$REPO" "$DOTFILES"
     fi
 
-    if [[ -f "$DOTFILES/install.sh" ]]; then
-        bash "$DOTFILES/install.sh"
-    fi
+    [[ -f "$DOTFILES/install.sh" ]] && bash "$DOTFILES/install.sh"
 
     ok "Dotfiles installed"
 }
@@ -762,24 +539,38 @@ show_menu() {
     echo -e "${BOLD}${CYAN}║          LamConfig — System Setup                    ║${NC}"
     echo -e "${BOLD}${CYAN}╚═══════════════════════════════════════════════════════╝${NC}"
     echo ""
-    echo -e "  ${BOLD}1)${NC}  Everything               ${DIM}(all categories below)${NC}"
-    echo -e "  ${BOLD}2)${NC}  Dev / Programming         ${DIM}(CLI, build, containers, embedded, AI)${NC}"
+    echo -e "  ${BOLD}1)${NC}  Everything               ${DIM}(all categories)${NC}"
+    echo -e "  ${BOLD}2)${NC}  Dev / Programming         ${DIM}(build, containers, embedded, AI)${NC}"
     echo -e "  ${BOLD}3)${NC}  Gaming                    ${DIM}(Steam, Lutris, Wine, Proton, MangoHud)${NC}"
     echo -e "  ${BOLD}4)${NC}  Productivity              ${DIM}(browsers, editors, creative, media)${NC}"
-    echo -e "  ${BOLD}5)${NC}  System / Fonts / Hardware  ${DIM}(fonts, drivers, bluetooth, printing, KDE)${NC}"
+    echo -e "  ${BOLD}5)${NC}  System / Fonts / Hardware  ${DIM}(fonts, drivers, bluetooth, KDE)${NC}"
     echo -e "  ${BOLD}6)${NC}  Dotfiles only              ${DIM}(clone & stow configs)${NC}"
     echo ""
-    echo -e "  ${BOLD}Toolchains:${NC}"
-    echo -e "  ${BOLD}r)${NC}  Rust         ${BOLD}n)${NC}  Node.js       ${BOLD}g)${NC}  Go"
-    echo -e "  ${BOLD}c)${NC}  Claude Code  ${BOLD}a)${NC}  All toolchains"
+    echo -e "  ${BOLD}CLI tier  [current: ${CLI_TIER}]:${NC}"
+    echo -e "  ${BOLD}L)${NC}  Lightweight  ${DIM}(git, zsh, nvim, tmux, fzf, ripgrep, bat, eza…)${NC}"
+    echo -e "  ${BOLD}S)${NC}  Standard     ${DIM}(+ lazygit, yazi, btop, delta, gh, fastfetch…)${NC}"
+    echo -e "  ${BOLD}E)${NC}  Extended     ${DIM}(+ zellij, htop, duf, micro, plocate, ugrep…)${NC}"
+    echo ""
+    echo -e "  ${BOLD}Toolchains:${NC}  ${BOLD}r)${NC} Rust  ${BOLD}n)${NC} Node  ${BOLD}g)${NC} Go  ${BOLD}c)${NC} Claude  ${BOLD}a)${NC} All"
     echo ""
     echo -e "  ${BOLD}0)${NC}  Exit"
     echo ""
 }
 
 # ══════════════════════════════════════════════════════════
-#  CLI argument parsing
+#  CLI Argument Parsing
 # ══════════════════════════════════════════════════════════
+parse_args() {
+    for arg in "$@"; do
+        case "$arg" in
+            --cli=lightweight) CLI_TIER="lightweight" ;;
+            --cli=standard)    CLI_TIER="standard" ;;
+            --cli=extended)    CLI_TIER="extended" ;;
+            --dry-run)         DRY_RUN=1; info "Dry-run mode enabled — nothing will be installed" ;;
+        esac
+    done
+}
+
 run_from_args() {
     local did_something=false
 
@@ -797,39 +588,47 @@ run_from_args() {
                 install_gaming
                 install_system
                 install_dotfiles
-                did_something=true
-                ;;
+                did_something=true ;;
             --dev)
                 install_aur_helper
                 install_cli_tools
                 install_dev
-                did_something=true
-                ;;
-            --gaming)       install_gaming; did_something=true ;;
+                did_something=true ;;
+            --gaming)       install_gaming;       did_something=true ;;
             --productivity) install_productivity; did_something=true ;;
-            --system)       install_system; did_something=true ;;
-            --dotfiles)     install_dotfiles; did_something=true ;;
-            --rust)         install_toolchain_rust; did_something=true ;;
-            --node)         install_toolchain_node; did_something=true ;;
-            --go)           install_toolchain_go; did_something=true ;;
-            --claude)       install_claude_code; did_something=true ;;
+            --system)       install_system;       did_something=true ;;
+            --dotfiles)     install_dotfiles;     did_something=true ;;
+            --rust)         install_toolchain_rust;  did_something=true ;;
+            --node)         install_toolchain_node;  did_something=true ;;
+            --go)           install_toolchain_go;    did_something=true ;;
+            --claude)       install_claude_code;     did_something=true ;;
+            --cli=*|--dry-run) ;;  # already parsed
             --help|-h)
-                echo "Usage: setup.sh [OPTIONS]"
-                echo ""
-                echo "  --all            Install everything"
-                echo "  --dev            CLI tools + build tools + containers + embedded"
-                echo "  --gaming         Steam, Lutris, Wine, Proton, MangoHud"
-                echo "  --productivity   Browsers, editors, creative, media"
-                echo "  --system         Fonts, drivers, bluetooth, printing, KDE"
-                echo "  --dotfiles       Clone & stow configs"
-                echo "  --rust           Rust via rustup"
-                echo "  --node           Node.js via nvm/pacman"
-                echo "  --go             Go"
-                echo "  --claude         Claude Code"
-                echo ""
-                echo "  No arguments = interactive menu"
-                exit 0
-                ;;
+                cat <<EOF
+Usage: setup.sh [OPTIONS]
+
+  --all              Install everything
+  --dev              CLI tools + build tools + containers + embedded
+  --gaming           Steam, Lutris, Wine, Proton, MangoHud
+  --productivity     Browsers, editors, creative, media
+  --system           Fonts, drivers, bluetooth, printing, KDE
+  --dotfiles         Clone & stow configs
+
+  --cli=lightweight  Minimal CLI tools
+  --cli=standard     Power-user CLI tools (default)
+  --cli=extended     Full comfort set
+
+  Toolchains:
+  --rust             Rust via rustup
+  --node             Node.js via nvm/pacman
+  --go               Go
+  --claude           Claude Code (requires Node)
+
+  --dry-run          Show what would be installed without installing
+
+  No arguments → interactive menu
+EOF
+                exit 0 ;;
         esac
     done
 
@@ -840,6 +639,7 @@ run_from_args() {
 #  Main
 # ══════════════════════════════════════════════════════════
 main() {
+    parse_args "$@"
     detect_distro
 
     if [[ $# -gt 0 ]]; then
@@ -852,52 +652,39 @@ main() {
 
     while true; do
         show_menu
-        read -rp "  Select [1-6, r/n/g/c/a, 0 to exit]: " choice
+        read -rp "  Select: " choice
 
         case "$choice" in
             1)
                 install_aur_helper
-                install_cli_tools
-                install_dev
-                install_toolchain_rust
-                install_toolchain_node
-                install_toolchain_go
-                install_claude_code
-                install_productivity
-                install_gaming
-                install_system
-                install_dotfiles
-                ;;
+                install_cli_tools; install_dev
+                install_toolchain_rust; install_toolchain_node
+                install_toolchain_go; install_claude_code
+                install_productivity; install_gaming
+                install_system; install_dotfiles ;;
             2)
                 install_aur_helper
-                install_cli_tools
-                install_dev
-                install_dotfiles
-                ;;
+                install_cli_tools; install_dev ;;
             3)  install_gaming ;;
             4)  install_productivity ;;
             5)  install_system ;;
             6)  install_dotfiles ;;
+            L|l) CLI_TIER="lightweight"; info "CLI tier → lightweight" ;;
+            S|s) CLI_TIER="standard";   info "CLI tier → standard" ;;
+            E|e) CLI_TIER="extended";   info "CLI tier → extended" ;;
             r)  install_toolchain_rust ;;
             n)  install_toolchain_node ;;
             g)  install_toolchain_go ;;
             c)  install_claude_code ;;
             a)
-                install_toolchain_rust
-                install_toolchain_node
-                install_toolchain_go
-                install_claude_code
-                ;;
-            0|q|"")
-                echo ""
-                ok "Done. Open a new terminal to apply changes."
-                exit 0
-                ;;
-            *)  warn "Invalid choice: $choice" ;;
+                install_toolchain_rust; install_toolchain_node
+                install_toolchain_go; install_claude_code ;;
+            0|q|"") echo ""; ok "Done."; exit 0 ;;
+            *)  warn "Invalid: $choice" ;;
         esac
 
         echo ""
-        ok "Category complete! Returning to menu..."
+        ok "Done — returning to menu..."
         echo ""
     done
 }
