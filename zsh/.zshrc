@@ -176,8 +176,22 @@ conf() {
   esac
 }
 
+# ── Second Brain ───────────────────────────────────────────
+# `notes` — open the vault in nvim as a server so Obsidian's
+# edit-in-neovim plugin can send files to this running instance
+VAULT="$HOME/Desktop/ObsidianVault"
+NVIM_SOCKET="/tmp/nvim-notes.sock"
+
+notes() {
+  rm -f "$NVIM_SOCKET"
+  cd "$VAULT" && nvim --listen "$NVIM_SOCKET" "$VAULT/10 - Atlas/Home.md"
+}
+
 # ── Powerlevel10k config ──────────────────────────────────
 [[ -f ~/.p10k.zsh ]] && source ~/.p10k.zsh
+
+# ── Atuin — shell history ─────────────────────────────────
+eval "$(atuin init zsh)"
 
 # ── envman ────────────────────────────────────────────────
 [[ -s "$HOME/.config/envman/load.sh" ]] && source "$HOME/.config/envman/load.sh"
