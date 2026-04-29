@@ -52,6 +52,16 @@ return {
     version = "*",
     dependencies = { "luarocks.nvim" },
     config = function()
+      -- Ensure luarocks-installed norg parsers are visible to treesitter
+      local rocks = vim.fn.stdpath("data") .. "/lazy-rocks"
+      local parser_dir = vim.fn.stdpath("data") .. "/site/parser"
+      for _, pkg in ipairs({ "tree-sitter-norg", "tree-sitter-norg-meta" }) do
+        local so_dir = rocks .. "/" .. pkg .. "/lib/lua/5.1/parser"
+        if vim.fn.isdirectory(so_dir) == 1 then
+          vim.opt.runtimepath:append(rocks .. "/" .. pkg .. "/lib/lua/5.1")
+        end
+      end
+
       require("neorg").setup({
         load = {
           ["core.defaults"] = {},       -- all standard Neorg keybinds

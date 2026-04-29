@@ -191,7 +191,7 @@ notes() {
 [[ -f ~/.p10k.zsh ]] && source ~/.p10k.zsh
 
 # ── Atuin — shell history ─────────────────────────────────
-eval "$(atuin init zsh)"
+command -v atuin &>/dev/null && eval "$(atuin init zsh)"
 
 # ── envman ────────────────────────────────────────────────
 [[ -s "$HOME/.config/envman/load.sh" ]] && source "$HOME/.config/envman/load.sh"

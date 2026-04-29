@@ -27,6 +27,9 @@ return {
         -- Linters
         "shellcheck",
         "ruff",
+        -- DAP adapters
+        "codelldb",
+        "debugpy",
       },
     },
   },

@@ -55,9 +55,8 @@ opt.fillchars = {
   eob = " ",
 }
 
--- Ghostty terminal — ensure correct cursor shapes
-if vim.env.TERM_PROGRAM == "ghostty" then
-  -- Ghostty handles cursor shapes natively, no special config needed
-  -- but ensure we don't send conflicting escape sequences
-  opt.guicursor = "n-v-c-sm:block,i-ci-ve:ver25,r-cr-o:hor20"
-end
+-- Cursor shapes
+--   block  = fat square (normal mode default)
+--   ver25  = thin vertical bar (insert mode, 25% width)
+--   hor20  = thin horizontal underline (replace mode)
+opt.guicursor = "n-v-c-sm:block,i-ci-ve:ver25,r-cr-o:hor20"
