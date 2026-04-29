@@ -176,6 +176,15 @@ conf() {
   esac
 }
 
+# ── Local LLM ─────────────────────────────────────────────
+alias llm='bash ~/local-llm/start.sh'
+alias llm-stop='bash ~/local-llm/stop.sh'
+alias llm-swap='bash ~/local-llm/swap.sh'
+alias llm-log='tail -f ~/local-llm/inference/dflash/server.log'
+alias llm-chat='bash ~/local-llm/chat.sh'
+alias llm-ui='bash ~/local-llm/frontend/chainlit/serve.sh'
+alias llm-langfuse='bash ~/local-llm/observability/langfuse/serve.sh'
+
 # ── Second Brain ───────────────────────────────────────────
 # `notes` — open the vault in nvim as a server so Obsidian's
 # edit-in-neovim plugin can send files to this running instance
